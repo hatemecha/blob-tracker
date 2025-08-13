@@ -4,7 +4,12 @@ import tkinter as tk
 from tkinter import filedialog
 from tqdm import tqdm
 import moviepy as mpe
+
 from scipy.optimize import linear_sum_assignment
+
+import json
+import os
+
 
 # Select file dialogs
 def select_file():
@@ -35,20 +40,48 @@ def create_control_panel():
 
 
 def show_help_panel():
-    help_img = np.zeros((220, 400, 3), dtype=np.uint8)
+    help_img = np.zeros((260, 400, 3), dtype=np.uint8)
     lines = [
         "Deslizadores en 'Controls':",
         "Umbral - binarizacion",
         "Area minima - tamano minimo",
         "Distancia max - seguimiento",
         "Max blobs - limite objetos",
+
         "Kalman - suavizado (0 off, 1 on)",
+
+        "s: guardar  l: cargar",
+
         "e: exportar  q: salir",
     ]
     for i, line in enumerate(lines):
         cv2.putText(help_img, line, (10, 30 + i*30), cv2.FONT_HERSHEY_SIMPLEX,
                     0.5, (255, 255, 255), 1)
     cv2.imshow('Ayuda', help_img)
+
+
+# Trackbar settings persistence
+SETTINGS_FILE = 'trackbar_settings.json'
+TRACKBAR_NAMES = ['Umbral','Area minima','Distancia max','Max blobs','Historial','Varianza','Caja B','Caja G','Caja R']
+
+
+def save_trackbar_settings(path=SETTINGS_FILE):
+    data = {name: cv2.getTrackbarPos(name, 'Controls') for name in TRACKBAR_NAMES}
+    with open(path, 'w') as f:
+        json.dump(data, f)
+    print(f'Trackbar settings saved to {path}')
+
+
+def load_trackbar_settings(path=SETTINGS_FILE):
+    if not os.path.exists(path):
+        return False
+    with open(path, 'r') as f:
+        data = json.load(f)
+    for name, val in data.items():
+        if name in TRACKBAR_NAMES:
+            cv2.setTrackbarPos(name, 'Controls', int(val))
+    print(f'Trackbar settings loaded from {path}')
+    return True
 
 
 # Core classes
@@ -195,6 +228,7 @@ if __name__=='__main__':
     if not ret: exit()
     h, w = frame.shape[:2]
     create_control_panel()
+    load_trackbar_settings()
     cv2.namedWindow('Preview', cv2.WINDOW_NORMAL)
 
     pre = Preprocessor(500,16); det=BlobDetector(500); trk=Tracker(50)
@@ -232,6 +266,10 @@ if __name__=='__main__':
 
         cv2.imshow('Preview',mosaic)
         key=cv2.waitKey(1)&0xFF
+        if key==ord('s'):
+            save_trackbar_settings()
+        if key==ord('l'):
+            load_trackbar_settings()
         if key==ord('e') and not exporting:
             exporting=True
             writer=cv2.VideoWriter(out_frames, cv2.VideoWriter_fourcc(*'mp4v'), vs.fps, (w,h))

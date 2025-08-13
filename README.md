@@ -22,8 +22,8 @@
   * **Video File Selection:** Graphical interface to easily select the input video.
   * **Foreground Segmentation:** Uses the MOG2 algorithm for background subtraction to create a foreground mask.
   * **Blob Detection:** Identifies contours in the foreground mask and filters out those below a defined minimum area.
-  * **Object Tracking:** A proximity-based tracking system assigns unique IDs to objects and tracks them across frames.
-  * **Real-time Control Panel:** Allows dynamic adjustment of key parameters such as threshold, minimum blob area, maximum tracking distance, maximum number of blobs, background subtractor history, variance threshold, and bounding box color.
+  * **Object Tracking:** Uses a cost matrix with the Hungarian algorithm to assign detections to tracked objects, with an optional Kalman filter for smoother position estimates.
+  * **Real-time Control Panel:** Allows dynamic adjustment of key parameters such as threshold, minimum blob area, maximum tracking distance, maximum number of blobs, background subtractor history, variance threshold, bounding box color, and Kalman filtering.
   * **Mosaic Visualization:** Simultaneously displays the original frame, foreground mask, clean mask, and the output frame with tracked objects.
   * **Video Export:** Exports the processed video to a new MP4 file, complete with a progress bar.
   * **Audio Merging:** Automatically combines the audio from the original video with the exported video.
@@ -33,10 +33,10 @@
 Ensure you have the following libraries installed. You can install them using pip:
 
 ```bash
-pip install opencv-python numpy moviepy tqdm
+pip install opencv-python numpy scipy moviepy tqdm
 ```
 
-`numpy` and `tqdm` are essential. `moviepy` is required for audio merging.
+`numpy`, `scipy`, and `tqdm` are essential. `moviepy` is required for audio merging.
 
 ## 4\. Usage
 
@@ -52,6 +52,7 @@ pip install opencv-python numpy moviepy tqdm
       * **Area minima:** Minimum area (in square pixels) for a contour to be considered a blob.
       * **Distancia max:** Maximum distance (in pixels) between a detected blob's centroid and an existing tracked object for it to be considered the same object.
       * **Max blobs:** Maximum number of blobs to track (larger blobs are prioritized).
+      * **Kalman:** Toggle (0/1) for applying Kalman filter smoothing to tracked positions.
       * **Historial:** Length of history for the MOG2 background subtraction algorithm.
       * **Varianza:** Variance threshold for the MOG2 background subtraction algorithm.
       * **Caja B, Caja G, Caja R:** BGR components of the bounding box and object ID color.
@@ -66,11 +67,11 @@ pip install opencv-python numpy moviepy tqdm
 The script is organized into several functions and classes to modularize the different stages of video processing.
 
   * **`select_file()`, `select_save_file()`:** Helper functions for opening file selection dialogs using `tkinter`.
-  * **`create_control_panel()`:** Sets up the OpenCV control window with sliders for all adjustable parameters.
+  * **`create_control_panel()`:** Sets up the OpenCV control window with sliders for all adjustable parameters, including a toggle for Kalman filtering.
   * **`VideoSource`:** Class to encapsulate video file reading and management.
   * **`Preprocessor`:** Class responsible for background subtraction and image preprocessing.
   * **`BlobDetector`:** Class for detecting blobs (contours) in the preprocessed mask.
-  * **`Tracker`:** Class that manages the tracking of multiple objects, assigning and updating object IDs.
+  * **`Tracker`:** Class that manages the tracking of multiple objects, using the Hungarian algorithm for assignment and an optional Kalman filter to smooth positions.
   * **`Visualizer`:** Static class for drawing tracking results on the frame.
   * **`if __name__ == '__main__':` (Main Block):** The main loop that initializes classes, reads frames, applies processing, updates parameters from the control panel, and manages visualization and export.
 
@@ -97,8 +98,8 @@ The script is organized into several functions and classes to modularize the dif
 
 ### `Tracker`
 
-  * **`__init__(self, max_dist)`:** Initializes the tracker with the maximum assignment distance, the next available object ID, and a dictionary of tracked objects (`id: centroid`).
-  * **`update(self, detections, max_blobs)`:** Assigns detections to existing tracked objects or creates new ones. Prioritizes larger blobs up to `max_blobs`. Returns a list of tracked objects (detections with assigned IDs).
+  * **`__init__(self, max_dist, use_kalman=False)`:** Initializes the tracker with the maximum assignment distance, optional Kalman filtering, the next available object ID, and dictionaries of tracked objects and filters.
+  * **`update(self, detections, max_blobs)`:** Builds a cost matrix between detections and existing objects and uses the Hungarian algorithm for assignment. New objects receive IDs, and, if enabled, a Kalman filter smooths the reported position. Returns a list of tracked detections with IDs.
 
 ### `Visualizer`
 
@@ -113,6 +114,7 @@ The "Controls" panel allows for real-time manipulation of the following paramete
   * **Area minima:** Used in `BlobDetector` to filter small contours.
   * **Distancia max:** Used in `Tracker` to determine if a detected blob corresponds to an existing tracked object.
   * **Max blobs:** Limits the number of blobs tracked simultaneously.
+  * **Kalman:** Turns Kalman filter smoothing on (1) or off (0) for tracked positions.
   * **Historial:** The `history` parameter for `cv2.createBackgroundSubtractorMOG2`. How many frames are used for the background model.
   * **Varianza:** The `varThreshold` parameter for `cv2.createBackgroundSubtractorMOG2`. Determines how far a pixel can be from the mean to be considered foreground.
   * **Caja B, Caja G, Caja R:** BGR values for the color of the drawn bounding boxes.

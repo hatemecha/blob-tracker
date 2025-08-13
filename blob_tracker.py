@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import filedialog
 from tqdm import tqdm
 import moviepy as mpe
+from scipy.optimize import linear_sum_assignment
 
 # Select file dialogs
 def select_file():
@@ -19,7 +20,7 @@ def select_save_file():
 # Create control panel
 def create_control_panel():
     cv2.namedWindow('Controls', cv2.WINDOW_NORMAL)
-    cv2.resizeWindow('Controls', 400, 350)
+    cv2.resizeWindow('Controls', 400, 400)
     cv2.createTrackbar('Umbral', 'Controls', 244, 255, lambda x: None)
 
     cv2.createTrackbar('Area minima', 'Controls', 500, 5000, lambda x: None)
@@ -30,6 +31,7 @@ def create_control_panel():
     cv2.createTrackbar('Caja B', 'Controls', 0, 255, lambda x: None)
     cv2.createTrackbar('Caja G', 'Controls', 255, 255, lambda x: None)
     cv2.createTrackbar('Caja R', 'Controls', 0, 255, lambda x: None)
+    cv2.createTrackbar('Kalman', 'Controls', 0, 1, lambda x: None)
 
 
 def show_help_panel():
@@ -40,6 +42,7 @@ def show_help_panel():
         "Area minima - tamano minimo",
         "Distancia max - seguimiento",
         "Max blobs - limite objetos",
+        "Kalman - suavizado (0 off, 1 on)",
         "e: exportar  q: salir",
     ]
     for i, line in enumerate(lines):
@@ -94,18 +97,78 @@ class BlobDetector:
         return blobs
 
 class Tracker:
-    def __init__(self, max_dist): self.max_dist, self.next_id, self.objects = max_dist, 1, {}
+    def __init__(self, max_dist, use_kalman=False):
+        self.max_dist = max_dist
+        self.use_kalman = use_kalman
+        self.next_id = 1
+        self.objects = {}
+        self.filters = {}
+
+    def _create_kf(self, centroid):
+        kf = cv2.KalmanFilter(4, 2)
+        kf.measurementMatrix = np.array([[1, 0, 0, 0],
+                                         [0, 1, 0, 0]], np.float32)
+        kf.transitionMatrix = np.array([[1, 0, 1, 0],
+                                        [0, 1, 0, 1],
+                                        [0, 0, 1, 0],
+                                        [0, 0, 0, 1]], np.float32)
+        kf.processNoiseCov = np.eye(4, dtype=np.float32) * 0.03
+        kf.measurementNoiseCov = np.eye(2, dtype=np.float32)
+        kf.statePre = np.array([[centroid[0]], [centroid[1]], [0], [0]], np.float32)
+        kf.statePost = kf.statePre.copy()
+        return kf
+
+    def set_use_kalman(self, flag):
+        self.use_kalman = flag
+        if not flag:
+            self.filters.clear()
+
     def update(self, detections, max_blobs):
-        tracks, new = [], []
-        dets = sorted(detections, key=lambda d: d['bbox'][2]*d['bbox'][3], reverse=True)[:max_blobs]
-        for det in dets:
-            c=det['centroid']; assigned=False
-            for oid, ocent in self.objects.copy().items():
-                if np.linalg.norm(np.array(ocent)-np.array(c))<=self.max_dist:
-                    self.objects[oid]=c; det['id']=oid; tracks.append(det); assigned=True; break
-            if not assigned: new.append(det)
-        for det in new:
-            oid=self.next_id; self.objects[oid]=det['centroid']; det['id']=oid; tracks.append(det); self.next_id+=1
+        tracks = []
+        dets = sorted(detections,
+                      key=lambda d: d['bbox'][2] * d['bbox'][3],
+                      reverse=True)[:max_blobs]
+
+        obj_ids = list(self.objects.keys())
+        obj_centroids = np.array([self.objects[i] for i in obj_ids]) if obj_ids else np.empty((0, 2))
+        det_centroids = np.array([d['centroid'] for d in dets]) if dets else np.empty((0, 2))
+
+        if obj_centroids.size and det_centroids.size:
+            cost = np.linalg.norm(obj_centroids[:, None, :] - det_centroids[None, :, :], axis=2)
+            row_ind, col_ind = linear_sum_assignment(cost)
+        else:
+            row_ind, col_ind = np.array([], dtype=int), np.array([], dtype=int)
+
+        assigned_dets = set()
+        for r, c in zip(row_ind, col_ind):
+            if cost[r, c] <= self.max_dist:
+                oid = obj_ids[r]
+                det = dets[c]
+                assigned_dets.add(c)
+                if self.use_kalman:
+                    if oid not in self.filters:
+                        self.filters[oid] = self._create_kf(det['centroid'])
+                    kf = self.filters[oid]
+                    kf.predict()
+                    measurement = np.array([[np.float32(det['centroid'][0])],
+                                            [np.float32(det['centroid'][1])]])
+                    estimate = kf.correct(measurement)
+                    pos = (int(estimate[0]), int(estimate[1]))
+                    self.objects[oid] = pos
+                    det['centroid'] = pos
+                else:
+                    self.objects[oid] = det['centroid']
+                det['id'] = oid
+                tracks.append(det)
+        for idx, det in enumerate(dets):
+            if idx not in assigned_dets:
+                oid = self.next_id
+                self.next_id += 1
+                self.objects[oid] = det['centroid']
+                det['id'] = oid
+                if self.use_kalman:
+                    self.filters[oid] = self._create_kf(det['centroid'])
+                tracks.append(det)
         return tracks
 
 class Visualizer:
@@ -145,6 +208,7 @@ if __name__=='__main__':
         det.min_area=cv2.getTrackbarPos('Area minima','Controls')
         trk.max_dist=cv2.getTrackbarPos('Distancia max','Controls')
         max_blobs=cv2.getTrackbarPos('Max blobs','Controls')
+        trk.set_use_kalman(bool(cv2.getTrackbarPos('Kalman','Controls')))
         history=cv2.getTrackbarPos('Historial','Controls')
         var_t=cv2.getTrackbarPos('Varianza','Controls')
         color=(cv2.getTrackbarPos('Caja B','Controls'),

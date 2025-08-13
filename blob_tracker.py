@@ -3,7 +3,7 @@ import numpy as np
 import tkinter as tk
 from tkinter import filedialog
 from tqdm import tqdm
-import moviepy.editor as mpe
+import moviepy as mpe
 
 # Select file dialogs
 def select_file():

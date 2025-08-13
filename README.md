@@ -2,14 +2,14 @@
 
 ## Table of Contents
 
-1.  [General Description](https://www.google.com/search?q=%231-general-description)
-2.  [Features](https://www.google.com/search?q=%232-features)
-3.  [Requirements](https://www.google.com/search?q=%233-requirements)
-4.  [Usage](https://www.google.com/search?q=%234-usage)
-5.  [Code Structure](https://www.google.com/search?q=%235-code-structure)
-6.  [Core Classes](https://www.google.com/search?q=%236-core-classes)
-7.  [Control Panel](https://www.google.com/search?q=%237-control-panel)
-8.  [Video Export](https://www.google.com/search?q=%238-video-export)
+1.  [General Description](#1-general-description)
+2.  [Features](#2-features)
+3.  [Requirements](#3-requirements)
+4.  [Usage](#4-usage)
+5.  [Code Structure](#5-code-structure)
+6.  [Core Classes](#6-core-classes)
+7.  [Control Panel](#7-control-panel)
+8.  [Video Export](#8-video-export)
 
 -----
 
@@ -33,10 +33,10 @@
 Ensure you have the following libraries installed. You can install them using pip:
 
 ```bash
-pip install opencv-python numpy scikit-learn moviepy tqdm
+pip install opencv-python numpy moviepy tqdm
 ```
 
-**Note:** `scikit-learn` is not directly used in the provided code, but `numpy` and `tqdm` are essential. `moviepy` is required for audio merging.
+`numpy` and `tqdm` are essential. `moviepy` is required for audio merging.
 
 ## 4\. Usage
 
@@ -54,7 +54,6 @@ pip install opencv-python numpy scikit-learn moviepy tqdm
       * **History:** Length of history for the MOG2 background subtraction algorithm.
       * **Var Thresh:** Variance threshold for the MOG2 background subtraction algorithm.
       * **Box B, Box G, Box R:** BGR components of the bounding box and object ID color.
-      * **Show Trace:** (Currently always 1) A slider for trace functionality, although it doesn't appear to be used in the current implementation.
 5.  **Preview Window:** The "Preview" window will display the mosaic visualization of the processing output.
 6.  **Export Video:** Press the `e` key while the "Preview" window is active to start video export. A progress bar will appear in the console. Once frame export is complete, audio will be merged with the video. The final output file will have `_with_audio.mp4` appended to its name.
 7.  **Quit:** Press the `q` key to close all windows and exit the program.
@@ -100,7 +99,7 @@ The script is organized into several functions and classes to modularize the dif
 
 ### `Visualizer`
 
-  * **`draw(frame, tracks, color, show_trace)` (static method):** Draws bounding boxes and IDs for each tracked object on the frame. The `show_trace` functionality is not implemented in this code.
+  * **`draw(frame, tracks, color)` (static method):** Draws bounding boxes and IDs for each tracked object on the frame.
 
 ## 7\. Control Panel
 
@@ -113,7 +112,6 @@ The "Controls" panel allows for real-time manipulation of the following paramete
   * **History:** The `history` parameter for `cv2.createBackgroundSubtractorMOG2`. How many frames are used for the background model.
   * **Var Thresh:** The `varThreshold` parameter for `cv2.createBackgroundSubtractorMOG2`. Determines how far a pixel can be from the mean to be considered foreground.
   * **Box B, Box G, Box R:** BGR values for the color of the drawn bounding boxes.
-  * **Show Trace:** A slider that currently has no visible effect on the implementation.
 
 ## 8\. Video Export
 

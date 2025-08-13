@@ -47,16 +47,17 @@ pip install opencv-python numpy moviepy tqdm
 2.  **Select Video:** A file dialog will pop up for you to select your input video file (`.mp4` or `.avi`).
 3.  **Select Save File:** Another file dialog will prompt you to specify the output MP4 file path and name for the processed frames.
 4.  **Control Panel:** A window named "Controls" will appear with sliders to adjust parameters.
-      * **Threshold:** Binary threshold for the foreground mask.
-      * **Min Area:** Minimum area (in square pixels) for a contour to be considered a blob.
-      * **Max Dist:** Maximum distance (in pixels) between a detected blob's centroid and an existing tracked object for it to be considered the same object.
-      * **Max Blobs:** Maximum number of blobs to track (larger blobs are prioritized).
-      * **History:** Length of history for the MOG2 background subtraction algorithm.
-      * **Var Thresh:** Variance threshold for the MOG2 background subtraction algorithm.
-      * **Box B, Box G, Box R:** BGR components of the bounding box and object ID color.
-5.  **Preview Window:** The "Preview" window will display the mosaic visualization of the processing output.
-6.  **Export Video:** Press the `e` key while the "Preview" window is active to start video export. A progress bar will appear in the console. Once frame export is complete, audio will be merged with the video. The final output file will have `_with_audio.mp4` appended to its name.
-7.  **Quit:** Press the `q` key to close all windows and exit the program.
+      * **Umbral:** Binary threshold for the foreground mask.
+      * **Area minima:** Minimum area (in square pixels) for a contour to be considered a blob.
+      * **Distancia max:** Maximum distance (in pixels) between a detected blob's centroid and an existing tracked object for it to be considered the same object.
+      * **Max blobs:** Maximum number of blobs to track (larger blobs are prioritized).
+      * **Historial:** Length of history for the MOG2 background subtraction algorithm.
+      * **Varianza:** Variance threshold for the MOG2 background subtraction algorithm.
+      * **Caja B, Caja G, Caja R:** BGR components of the bounding box and object ID color.
+5.  **Help Window:** A separate "Ayuda" window summarizes these controls and lists key commands (`e` to export, `q` to quit).
+6.  **Preview Window:** The "Preview" window will display the mosaic visualization of the processing output with quadrant labels (Original, Mascara FG, Mascara limpia y Salida).
+7.  **Export Video:** Press the `e` key while the "Preview" window is active to start video export. A progress bar will appear in the console. Once frame export is complete, audio will be merged with the video. The final output file will have `_with_audio.mp4` appended to its name.
+8.  **Quit:** Press the `q` key to close all windows and exit the program.
 
 ## 5\. Code Structure
 
@@ -105,13 +106,13 @@ The script is organized into several functions and classes to modularize the dif
 
 The "Controls" panel allows for real-time manipulation of the following parameters:
 
-  * **Threshold:** Used in `cv2.threshold` to binarize the foreground mask.
-  * **Min Area:** Used in `BlobDetector` to filter small contours.
-  *   * **Max Dist:** Used in `Tracker` to determine if a detected blob corresponds to an existing tracked object.
-  * **Max Blobs:** Limits the number of blobs tracked simultaneously.
-  * **History:** The `history` parameter for `cv2.createBackgroundSubtractorMOG2`. How many frames are used for the background model.
-  * **Var Thresh:** The `varThreshold` parameter for `cv2.createBackgroundSubtractorMOG2`. Determines how far a pixel can be from the mean to be considered foreground.
-  * **Box B, Box G, Box R:** BGR values for the color of the drawn bounding boxes.
+  * **Umbral:** Used in `cv2.threshold` to binarize the foreground mask.
+  * **Area minima:** Used in `BlobDetector` to filter small contours.
+  * **Distancia max:** Used in `Tracker` to determine if a detected blob corresponds to an existing tracked object.
+  * **Max blobs:** Limits the number of blobs tracked simultaneously.
+  * **Historial:** The `history` parameter for `cv2.createBackgroundSubtractorMOG2`. How many frames are used for the background model.
+  * **Varianza:** The `varThreshold` parameter for `cv2.createBackgroundSubtractorMOG2`. Determines how far a pixel can be from the mean to be considered foreground.
+  * **Caja B, Caja G, Caja R:** BGR values for the color of the drawn bounding boxes.
 
 ## 8\. Video Export
 

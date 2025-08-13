@@ -21,14 +21,32 @@ def create_control_panel():
     cv2.namedWindow('Controls', cv2.WINDOW_NORMAL)
     cv2.resizeWindow('Controls', 400, 350)
     cv2.createTrackbar('Umbral', 'Controls', 244, 255, lambda x: None)
-    cv2.createTrackbar('AreaMin', 'Controls', 500, 5000, lambda x: None)
-    cv2.createTrackbar('DistMax', 'Controls', 50, 200, lambda x: None)
-    cv2.createTrackbar('MaxBlobs', 'Controls', 10, 100, lambda x: None)
+
+    cv2.createTrackbar('Area minima', 'Controls', 500, 5000, lambda x: None)
+    cv2.createTrackbar('Distancia max', 'Controls', 50, 200, lambda x: None)
+    cv2.createTrackbar('Max blobs', 'Controls', 10, 100, lambda x: None)
     cv2.createTrackbar('Historial', 'Controls', 500, 2000, lambda x: None)
     cv2.createTrackbar('Varianza', 'Controls', 16, 100, lambda x: None)
-    cv2.createTrackbar('CajaB', 'Controls', 0, 255, lambda x: None)
-    cv2.createTrackbar('CajaG', 'Controls', 255, 255, lambda x: None)
-    cv2.createTrackbar('CajaR', 'Controls', 0, 255, lambda x: None)
+    cv2.createTrackbar('Caja B', 'Controls', 0, 255, lambda x: None)
+    cv2.createTrackbar('Caja G', 'Controls', 255, 255, lambda x: None)
+    cv2.createTrackbar('Caja R', 'Controls', 0, 255, lambda x: None)
+
+
+def show_help_panel():
+    help_img = np.zeros((220, 400, 3), dtype=np.uint8)
+    lines = [
+        "Deslizadores en 'Controls':",
+        "Umbral - binarizacion",
+        "Area minima - tamano minimo",
+        "Distancia max - seguimiento",
+        "Max blobs - limite objetos",
+        "e: exportar  q: salir",
+    ]
+    for i, line in enumerate(lines):
+        cv2.putText(help_img, line, (10, 30 + i*30), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5, (255, 255, 255), 1)
+    cv2.imshow('Ayuda', help_img)
+
 
 # Core classes
 class VideoSource:
@@ -123,14 +141,16 @@ if __name__=='__main__':
         ret, frame = vs.read()
         if not ret: vs.reset(); continue
         thresh=cv2.getTrackbarPos('Umbral','Controls')
-        det.min_area=cv2.getTrackbarPos('AreaMin','Controls')
-        trk.max_dist=cv2.getTrackbarPos('DistMax','Controls')
-        max_blobs=cv2.getTrackbarPos('MaxBlobs','Controls')
+
+        det.min_area=cv2.getTrackbarPos('Area minima','Controls')
+        trk.max_dist=cv2.getTrackbarPos('Distancia max','Controls')
+        max_blobs=cv2.getTrackbarPos('Max blobs','Controls')
         history=cv2.getTrackbarPos('Historial','Controls')
         var_t=cv2.getTrackbarPos('Varianza','Controls')
-        color=(cv2.getTrackbarPos('CajaB','Controls'),
-               cv2.getTrackbarPos('CajaG','Controls'),
-               cv2.getTrackbarPos('CajaR','Controls'))
+        color=(cv2.getTrackbarPos('Caja B','Controls'),
+               cv2.getTrackbarPos('Caja G','Controls'),
+               cv2.getTrackbarPos('Caja R','Controls'))
+
         pre.update(history,var_t)
         fg,clean=pre.apply(frame,thresh)
         dets=det.detect(clean)
@@ -144,6 +164,8 @@ if __name__=='__main__':
         cv2.putText(mosaic,'Mascara FG',(w+10,20),cv2.FONT_HERSHEY_SIMPLEX,0.6,(255,255,255),1)
         cv2.putText(mosaic,'Mascara limpia',(10,h+20),cv2.FONT_HERSHEY_SIMPLEX,0.6,(255,255,255),1)
         cv2.putText(mosaic,'Salida',(w+10,h+20),cv2.FONT_HERSHEY_SIMPLEX,0.6,(255,255,255),1)
+        show_help_panel()
+
         cv2.imshow('Preview',mosaic)
         key=cv2.waitKey(1)&0xFF
         if key==ord('e') and not exporting:

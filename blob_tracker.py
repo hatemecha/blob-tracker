@@ -3,16 +3,18 @@ import numpy as np
 import tkinter as tk
 from tkinter import filedialog
 from tqdm import tqdm
-import moviepy as mpe
+import moviepy.editor as mpe
 
 # Select file dialogs
 def select_file():
     root = tk.Tk(); root.withdraw()
-    return filedialog.askopenfilename(title='Seleccionar video', filetypes=[('Video Files','*.mp4 *.avi')])
+    path = filedialog.askopenfilename(title='Seleccionar video', filetypes=[('Video Files','*.mp4 *.avi')])
+    return path or None
 
 def select_save_file():
     root = tk.Tk(); root.withdraw()
-    return filedialog.asksaveasfilename(title='Guardar salida (frames only)', defaultextension='.mp4', filetypes=[('MP4','.mp4')])
+    path = filedialog.asksaveasfilename(title='Guardar salida (frames only)', defaultextension='.mp4', filetypes=[('MP4','.mp4')])
+    return path or None
 
 # Create control panel
 def create_control_panel():
@@ -27,7 +29,6 @@ def create_control_panel():
     cv2.createTrackbar('Box B', 'Controls', 0, 255, lambda x: None)
     cv2.createTrackbar('Box G', 'Controls', 255, 255, lambda x: None)
     cv2.createTrackbar('Box R', 'Controls', 0, 255, lambda x: None)
-    cv2.createTrackbar('Show Trace', 'Controls', 1, 1, lambda x: None)
 
 # Core classes
 class VideoSource:
@@ -91,7 +92,7 @@ class Tracker:
 
 class Visualizer:
     @staticmethod
-    def draw(frame, tracks, color, show_trace):
+    def draw(frame, tracks, color):
         for t in tracks:
             x,y,w,h=t['bbox']; oid=t['id']
             cv2.rectangle(frame,(x,y),(x+w,y+h),color,2)
@@ -101,7 +102,13 @@ class Visualizer:
 # Main
 if __name__=='__main__':
     src = select_file()
+    if not src:
+        print('No video selected. Exiting.')
+        exit()
     out_frames = select_save_file()
+    if not out_frames:
+        print('No output file selected. Exiting.')
+        exit()
     vs = VideoSource(src)
     ret, frame = vs.read()
     if not ret: exit()
@@ -124,12 +131,11 @@ if __name__=='__main__':
         color=(cv2.getTrackbarPos('Box B','Controls'),
                cv2.getTrackbarPos('Box G','Controls'),
                cv2.getTrackbarPos('Box R','Controls'))
-        show_trace=bool(cv2.getTrackbarPos('Show Trace','Controls'))
         pre.update(history,var_t)
         fg,clean=pre.apply(frame,thresh)
         dets=det.detect(clean)
         tracks=trk.update(dets,max_blobs)
-        out=Visualizer.draw(frame.copy(),tracks,color,show_trace)
+        out=Visualizer.draw(frame.copy(),tracks,color)
         top=np.hstack([frame,cv2.cvtColor(fg,cv2.COLOR_GRAY2BGR)])
         bottom=np.hstack([cv2.cvtColor(clean,cv2.COLOR_GRAY2BGR),out])
         mosaic=cv2.resize(np.vstack([top,bottom]),(w*2,h*2))

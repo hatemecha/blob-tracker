@@ -9,6 +9,7 @@ from scipy.optimize import linear_sum_assignment
 
 import json
 import os
+import csv
 
 
 # Select file dialogs
@@ -33,14 +34,13 @@ def create_control_panel():
     cv2.createTrackbar('Max blobs', 'Controls', 10, 100, lambda x: None)
     cv2.createTrackbar('Historial', 'Controls', 500, 2000, lambda x: None)
     cv2.createTrackbar('Varianza', 'Controls', 16, 100, lambda x: None)
-    cv2.createTrackbar('Caja B', 'Controls', 0, 255, lambda x: None)
-    cv2.createTrackbar('Caja G', 'Controls', 255, 255, lambda x: None)
-    cv2.createTrackbar('Caja R', 'Controls', 0, 255, lambda x: None)
     cv2.createTrackbar('Kalman', 'Controls', 0, 1, lambda x: None)
+    cv2.createTrackbar('Ver rastro', 'Controls', 1, 1, lambda x: None)
+    cv2.createTrackbar('Len rastro', 'Controls', 20, 200, lambda x: None)
 
 
 def show_help_panel():
-    help_img = np.zeros((260, 400, 3), dtype=np.uint8)
+    help_img = np.zeros((360, 400, 3), dtype=np.uint8)
     lines = [
         "Deslizadores en 'Controls':",
         "Umbral - binarizacion",
@@ -49,8 +49,11 @@ def show_help_panel():
         "Max blobs - limite objetos",
 
         "Kalman - suavizado (0 off, 1 on)",
+        "Ver rastro - mostrar rastro",
+        "Len rastro - puntos en rastro",
 
         "s: guardar  l: cargar",
+        "r: ROI (definir/reset)",
 
         "e: exportar  q: salir",
     ]
@@ -62,7 +65,7 @@ def show_help_panel():
 
 # Trackbar settings persistence
 SETTINGS_FILE = 'trackbar_settings.json'
-TRACKBAR_NAMES = ['Umbral','Area minima','Distancia max','Max blobs','Historial','Varianza','Caja B','Caja G','Caja R']
+TRACKBAR_NAMES = ['Umbral','Area minima','Distancia max','Max blobs','Historial','Varianza','Kalman','Ver rastro','Len rastro']
 
 
 def save_trackbar_settings(path=SETTINGS_FILE):
@@ -136,6 +139,8 @@ class Tracker:
         self.next_id = 1
         self.objects = {}
         self.filters = {}
+        self.colors = {}
+        self.trails = {}
 
     def _create_kf(self, centroid):
         kf = cv2.KalmanFilter(4, 2)
@@ -156,7 +161,7 @@ class Tracker:
         if not flag:
             self.filters.clear()
 
-    def update(self, detections, max_blobs):
+    def update(self, detections, max_blobs, trail_len):
         tracks = []
         dets = sorted(detections,
                       key=lambda d: d['bbox'][2] * d['bbox'][3],
@@ -191,14 +196,22 @@ class Tracker:
                     det['centroid'] = pos
                 else:
                     self.objects[oid] = det['centroid']
+                self.trails.setdefault(oid, []).append(det['centroid'])
+                self.trails[oid] = self.trails[oid][-trail_len:]
                 det['id'] = oid
+                det['color'] = self.colors.get(oid, (0,255,0))
+                det['trail'] = self.trails[oid]
                 tracks.append(det)
         for idx, det in enumerate(dets):
             if idx not in assigned_dets:
                 oid = self.next_id
                 self.next_id += 1
                 self.objects[oid] = det['centroid']
+                self.colors[oid] = tuple(np.random.randint(0,256,3).tolist())
+                self.trails[oid] = [det['centroid']]
                 det['id'] = oid
+                det['color'] = self.colors[oid]
+                det['trail'] = self.trails[oid]
                 if self.use_kalman:
                     self.filters[oid] = self._create_kf(det['centroid'])
                 tracks.append(det)
@@ -206,11 +219,16 @@ class Tracker:
 
 class Visualizer:
     @staticmethod
-    def draw(frame, tracks, color):
+    def draw(frame, tracks, show_trails):
         for t in tracks:
             x,y,w,h=t['bbox']; oid=t['id']
+            color = t.get('color', (0,255,0))
             cv2.rectangle(frame,(x,y),(x+w,y+h),color,2)
             cv2.putText(frame,f"ID {oid}",(x,y-5),cv2.FONT_HERSHEY_SIMPLEX,0.5,color,1)
+            if show_trails:
+                pts = t.get('trail', [])
+                if len(pts) > 1:
+                    cv2.polylines(frame, [np.array(pts, np.int32)], False, color, 2)
         return frame
 
 # Main
@@ -233,10 +251,14 @@ if __name__=='__main__':
 
     pre = Preprocessor(500,16); det=BlobDetector(500); trk=Tracker(50)
     exporting = False; writer = None; bar = None
+    roi = None
+    frame_idx = 0
+    track_logs = []
 
     while True:
         ret, frame = vs.read()
-        if not ret: vs.reset(); continue
+        if not ret:
+            vs.reset(); frame_idx = 0; continue
         thresh=cv2.getTrackbarPos('Umbral','Controls')
 
         det.min_area=cv2.getTrackbarPos('Area minima','Controls')
@@ -245,15 +267,28 @@ if __name__=='__main__':
         trk.set_use_kalman(bool(cv2.getTrackbarPos('Kalman','Controls')))
         history=cv2.getTrackbarPos('Historial','Controls')
         var_t=cv2.getTrackbarPos('Varianza','Controls')
-        color=(cv2.getTrackbarPos('Caja B','Controls'),
-               cv2.getTrackbarPos('Caja G','Controls'),
-               cv2.getTrackbarPos('Caja R','Controls'))
+        show_trails=bool(cv2.getTrackbarPos('Ver rastro','Controls'))
+        trail_len=cv2.getTrackbarPos('Len rastro','Controls')
 
         pre.update(history,var_t)
         fg,clean=pre.apply(frame,thresh)
+        if roi is not None:
+            x,y,w_roi,h_roi = roi
+            mask_roi = np.zeros_like(clean)
+            mask_roi[y:y+h_roi, x:x+w_roi] = clean[y:y+h_roi, x:x+w_roi]
+            clean = mask_roi
+            mask_fg = np.zeros_like(fg)
+            mask_fg[y:y+h_roi, x:x+w_roi] = fg[y:y+h_roi, x:x+w_roi]
+            fg = mask_fg
         dets=det.detect(clean)
-        tracks=trk.update(dets,max_blobs)
-        out=Visualizer.draw(frame.copy(),tracks,color)
+        tracks=trk.update(dets,max_blobs,trail_len)
+        out=Visualizer.draw(frame.copy(),tracks,show_trails)
+        if roi is not None:
+            x,y,w_roi,h_roi = roi
+            cv2.rectangle(out,(x,y),(x+w_roi,y+h_roi),(0,255,255),1)
+        for t in tracks:
+            track_logs.append([frame_idx, t['id'], t['centroid'][0], t['centroid'][1]])
+        frame_idx += 1
         top=np.hstack([frame,cv2.cvtColor(fg,cv2.COLOR_GRAY2BGR)])
         bottom=np.hstack([cv2.cvtColor(clean,cv2.COLOR_GRAY2BGR),out])
         mosaic=np.vstack([top,bottom])
@@ -270,10 +305,14 @@ if __name__=='__main__':
             save_trackbar_settings()
         if key==ord('l'):
             load_trackbar_settings()
+        if key==ord('r'):
+            roi = cv2.selectROI('Preview', frame, fromCenter=False, showCrosshair=True)
+            if roi == (0,0,0,0):
+                roi = None
         if key==ord('e') and not exporting:
             exporting=True
             writer=cv2.VideoWriter(out_frames, cv2.VideoWriter_fourcc(*'mp4v'), vs.fps, (w,h))
-            vs.reset()
+            vs.reset(); frame_idx = 0
             bar=tqdm(total=vs.total_frames, desc='Exporting frames')
         if exporting:
             writer.write(out)
@@ -286,7 +325,11 @@ if __name__=='__main__':
                 final = temp_clip.with_audio(audio_clip)
                 final.write_videofile(out_frames.replace('.mp4','_with_audio.mp4'), codec='libx264', audio_codec='aac')
                 print('Export complete with audio')
-                vs.reset()
+                vs.reset(); frame_idx = 0
         if key==ord('q'): break
     vs.release()
     cv2.destroyAllWindows()
+    with open(out_frames.replace('.mp4','_tracks.csv'),'w',newline='') as f:
+        writer_csv=csv.writer(f)
+        writer_csv.writerow(['frame','id','x','y'])
+        writer_csv.writerows(track_logs)

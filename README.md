@@ -22,8 +22,8 @@
   * **Video File Selection:** Graphical interface to easily select the input video.
   * **Foreground Segmentation:** Uses the MOG2 algorithm for background subtraction to create a foreground mask.
   * **Blob Detection:** Identifies contours in the foreground mask and filters out those below a defined minimum area.
-  * **Object Tracking:** A proximity-based tracking system assigns unique IDs to objects and tracks them across frames.
-  * **Real-time Control Panel:** Allows dynamic adjustment of key parameters such as threshold, minimum blob area, maximum tracking distance, maximum number of blobs, background subtractor history, variance threshold, and bounding box color.
+  * **Object Tracking:** A proximity-based tracking system assigns unique IDs and colors to objects, tracking them across frames and recording recent positions for trail visualization.
+  * **Real-time Control Panel:** Allows dynamic adjustment of key parameters such as threshold, minimum blob area, maximum tracking distance, maximum number of blobs, background subtractor history, variance threshold, trail length, and trail visibility.
   * **Mosaic Visualization:** Simultaneously displays the original frame, foreground mask, clean mask, and the output frame with tracked objects.
   * **Video Export:** Exports the processed video to a new MP4 file, complete with a progress bar.
   * **Audio Merging:** Automatically combines the audio from the original video with the exported video.
@@ -54,7 +54,8 @@ pip install opencv-python numpy moviepy tqdm
       * **Max blobs:** Maximum number of blobs to track (larger blobs are prioritized).
       * **Historial:** Length of history for the MOG2 background subtraction algorithm.
       * **Varianza:** Variance threshold for the MOG2 background subtraction algorithm.
-      * **Caja B, Caja G, Caja R:** BGR components of the bounding box and object ID color.
+      * **Trail length:** Number of recent positions stored for each object.
+      * **Show trails:** Toggle to display or hide object trails.
 5.  **Help Window:** A separate "Ayuda" window summarizes these controls and lists key commands (`e` to export, `q` to quit).
 6.  **Preview Window:** The "Preview" window will display the mosaic visualization of the processing output with quadrant labels (Original, Mascara FG, Mascara limpia y Salida).
 7.  **Export Video:** Press the `e` key while the "Preview" window is active to start video export. A progress bar will appear in the console. Once frame export is complete, audio will be merged with the video. The final output file will have `_with_audio.mp4` appended to its name.
@@ -97,12 +98,12 @@ The script is organized into several functions and classes to modularize the dif
 
 ### `Tracker`
 
-  * **`__init__(self, max_dist)`:** Initializes the tracker with the maximum assignment distance, the next available object ID, and a dictionary of tracked objects (`id: centroid`).
-  * **`update(self, detections, max_blobs)`:** Assigns detections to existing tracked objects or creates new ones. Prioritizes larger blobs up to `max_blobs`. Returns a list of tracked objects (detections with assigned IDs).
+  * **`__init__(self, max_dist)`:** Initializes the tracker with the maximum assignment distance, the next available object ID, and structures to store object centroids, colors, and trails.
+  * **`update(self, detections, max_blobs, trail_len)`:** Assigns detections to existing tracked objects or creates new ones, recording their recent centroids up to `trail_len`. Prioritizes larger blobs up to `max_blobs` and returns detections with IDs, colors, and trails.
 
 ### `Visualizer`
 
-  * **`draw(frame, tracks, color)` (static method):** Draws bounding boxes and IDs for each tracked object on the frame.
+  * **`draw(frame, tracks, show_trails)` (static method):** Draws bounding boxes and IDs for each tracked object using its color and optionally renders a polyline trail of recent positions.
 
 ## 7\. Control Panel
 
@@ -115,7 +116,8 @@ The "Controls" panel allows for real-time manipulation of the following paramete
   * **Max blobs:** Limits the number of blobs tracked simultaneously.
   * **Historial:** The `history` parameter for `cv2.createBackgroundSubtractorMOG2`. How many frames are used for the background model.
   * **Varianza:** The `varThreshold` parameter for `cv2.createBackgroundSubtractorMOG2`. Determines how far a pixel can be from the mean to be considered foreground.
-  * **Caja B, Caja G, Caja R:** BGR values for the color of the drawn bounding boxes.
+  * **Trail length:** Number of recent centroid positions drawn as a trail.
+  * **Show trails:** Toggle to display or hide the trails.
 
 
 ## 8\. Video Export

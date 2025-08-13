@@ -27,9 +27,8 @@ def create_control_panel():
     cv2.createTrackbar('Max blobs', 'Controls', 10, 100, lambda x: None)
     cv2.createTrackbar('Historial', 'Controls', 500, 2000, lambda x: None)
     cv2.createTrackbar('Varianza', 'Controls', 16, 100, lambda x: None)
-    cv2.createTrackbar('Caja B', 'Controls', 0, 255, lambda x: None)
-    cv2.createTrackbar('Caja G', 'Controls', 255, 255, lambda x: None)
-    cv2.createTrackbar('Caja R', 'Controls', 0, 255, lambda x: None)
+    cv2.createTrackbar('Trail length', 'Controls', 20, 50, lambda x: None)
+    cv2.createTrackbar('Show trails', 'Controls', 1, 1, lambda x: None)
 
 
 def show_help_panel():
@@ -40,6 +39,8 @@ def show_help_panel():
         "Area minima - tamano minimo",
         "Distancia max - seguimiento",
         "Max blobs - limite objetos",
+        "Trail length - longitud rastro",
+        "Show trails - 0/1",
         "e: exportar  q: salir",
     ]
     for i, line in enumerate(lines):
@@ -94,27 +95,60 @@ class BlobDetector:
         return blobs
 
 class Tracker:
-    def __init__(self, max_dist): self.max_dist, self.next_id, self.objects = max_dist, 1, {}
-    def update(self, detections, max_blobs):
-        tracks, new = [], []
+    def __init__(self, max_dist):
+        self.max_dist = max_dist
+        self.next_id = 1
+        self.objects = {}
+        self.colors = {}
+        self.trails = {}
+
+    def _gen_color(self):
+        return tuple(np.random.randint(0, 256, 3).tolist())
+
+    def update(self, detections, max_blobs, trail_len):
+        tracks = []
         dets = sorted(detections, key=lambda d: d['bbox'][2]*d['bbox'][3], reverse=True)[:max_blobs]
+        new = []
         for det in dets:
-            c=det['centroid']; assigned=False
-            for oid, ocent in self.objects.copy().items():
-                if np.linalg.norm(np.array(ocent)-np.array(c))<=self.max_dist:
-                    self.objects[oid]=c; det['id']=oid; tracks.append(det); assigned=True; break
-            if not assigned: new.append(det)
+            c = det['centroid']
+            assigned = False
+            for oid, ocent in list(self.objects.items()):
+                if np.linalg.norm(np.array(ocent) - np.array(c)) <= self.max_dist:
+                    self.objects[oid] = c
+                    det['id'] = oid
+                    assigned = True
+                    break
+            if not assigned:
+                new.append(det)
         for det in new:
-            oid=self.next_id; self.objects[oid]=det['centroid']; det['id']=oid; tracks.append(det); self.next_id+=1
+            oid = self.next_id
+            self.next_id += 1
+            self.objects[oid] = det['centroid']
+            self.colors[oid] = self._gen_color()
+            self.trails[oid] = []
+            det['id'] = oid
+        for det in dets:
+            oid = det['id']
+            self.trails[oid].append(det['centroid'])
+            if len(self.trails[oid]) > trail_len:
+                self.trails[oid] = self.trails[oid][-trail_len:]
+            det['trail'] = self.trails[oid]
+            det['color'] = self.colors[oid]
+            tracks.append(det)
         return tracks
 
 class Visualizer:
     @staticmethod
-    def draw(frame, tracks, color):
+    def draw(frame, tracks, show_trails):
         for t in tracks:
-            x,y,w,h=t['bbox']; oid=t['id']
-            cv2.rectangle(frame,(x,y),(x+w,y+h),color,2)
-            cv2.putText(frame,f"ID {oid}",(x,y-5),cv2.FONT_HERSHEY_SIMPLEX,0.5,color,1)
+            x, y, w, h = t['bbox']
+            oid = t['id']
+            color = t['color']
+            cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+            cv2.putText(frame, f"ID {oid}", (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+            if show_trails and len(t['trail']) > 1:
+                pts = np.array(t['trail'], dtype=np.int32)
+                cv2.polylines(frame, [pts], False, color, 2)
         return frame
 
 # Main
@@ -142,20 +176,19 @@ if __name__=='__main__':
         if not ret: vs.reset(); continue
         thresh=cv2.getTrackbarPos('Umbral','Controls')
 
-        det.min_area=cv2.getTrackbarPos('Area minima','Controls')
-        trk.max_dist=cv2.getTrackbarPos('Distancia max','Controls')
-        max_blobs=cv2.getTrackbarPos('Max blobs','Controls')
-        history=cv2.getTrackbarPos('Historial','Controls')
-        var_t=cv2.getTrackbarPos('Varianza','Controls')
-        color=(cv2.getTrackbarPos('Caja B','Controls'),
-               cv2.getTrackbarPos('Caja G','Controls'),
-               cv2.getTrackbarPos('Caja R','Controls'))
+        det.min_area = cv2.getTrackbarPos('Area minima', 'Controls')
+        trk.max_dist = cv2.getTrackbarPos('Distancia max', 'Controls')
+        max_blobs = cv2.getTrackbarPos('Max blobs', 'Controls')
+        history = cv2.getTrackbarPos('Historial', 'Controls')
+        var_t = cv2.getTrackbarPos('Varianza', 'Controls')
+        trail_len = cv2.getTrackbarPos('Trail length', 'Controls')
+        show_trails = cv2.getTrackbarPos('Show trails', 'Controls') == 1
 
         pre.update(history,var_t)
         fg,clean=pre.apply(frame,thresh)
-        dets=det.detect(clean)
-        tracks=trk.update(dets,max_blobs)
-        out=Visualizer.draw(frame.copy(),tracks,color)
+        dets = det.detect(clean)
+        tracks = trk.update(dets, max_blobs, trail_len)
+        out = Visualizer.draw(frame.copy(), tracks, show_trails)
         top=np.hstack([frame,cv2.cvtColor(fg,cv2.COLOR_GRAY2BGR)])
         bottom=np.hstack([cv2.cvtColor(clean,cv2.COLOR_GRAY2BGR),out])
         mosaic=np.vstack([top,bottom])

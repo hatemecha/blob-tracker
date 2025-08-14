@@ -55,8 +55,8 @@ def show_help_panel():
         "Area minima - tamano minimo",
         "Distancia max - seguimiento",
         "Max blobs - limite objetos",
-        "Ratio min/max - relacion ancho/alto",
-        "Circ min/max - circularidad",
+        "Ratio min/max - relacion ancho/alto (valor/100)",
+        "Circ min/max - circularidad (valor/100)",
 
         "Historial - frames para fondo",
         "Varianza - umbral de varianza",
@@ -155,6 +155,12 @@ class BlobDetector:
         self.circ_max = circ_max
 
     def detect(self, mask):
+        # Validate and correct ratio and circularity ranges
+        self.ar_min = max(0.0, self.ar_min)
+        self.ar_max = max(self.ar_min, self.ar_max)
+        self.circ_min = max(0.0, min(self.circ_min, 1.0))
+        self.circ_max = max(self.circ_min, min(self.circ_max, 1.0))
+
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         blobs = []
         for cnt in contours:

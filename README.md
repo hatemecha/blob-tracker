@@ -59,6 +59,7 @@ pip install opencv-python numpy scipy moviepy tqdm
       * **Kalman:** Toggle (0/1) for applying Kalman filter smoothing to tracked positions.
       * **Historial:** Length of history for the MOG2 background subtraction algorithm.
       * **Varianza:** Variance threshold for the MOG2 background subtraction algorithm.
+      * **Kernel:** Size of the morphological opening kernel used to clean noise after binarization.
       * **Ver rastro:** Toggle (0/1) to show motion trails.
       * **Len rastro:** Number of recent positions drawn in the trail.
       * **Color B/G/R:** Sets the bounding box color; the "Color" window previews the selection.
@@ -124,6 +125,7 @@ The "Controls" panel allows for real-time manipulation of the following paramete
   * **Kalman:** Turns Kalman filter smoothing on (1) or off (0) for tracked positions.
   * **Historial:** The `history` parameter for `cv2.createBackgroundSubtractorMOG2`. How many frames are used for the background model.
   * **Varianza:** The `varThreshold` parameter for `cv2.createBackgroundSubtractorMOG2`. Determines how far a pixel can be from the mean to be considered foreground.
+  * **Kernel:** Size of the kernel for the morphological opening that cleans noise after binarization.
   * **Ver rastro:** Toggles the drawing of motion trails.
   * **Len rastro:** Number of points kept in each trail.
 

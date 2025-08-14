@@ -34,6 +34,7 @@ def create_control_panel():
     cv2.createTrackbar('Max blobs', 'Controls', 10, 100, lambda x: None)
     cv2.createTrackbar('Historial', 'Controls', 500, 2000, lambda x: None)
     cv2.createTrackbar('Varianza', 'Controls', 16, 100, lambda x: None)
+    cv2.createTrackbar('Kernel', 'Controls', 3, 21, lambda x: None)
     cv2.createTrackbar('Kalman', 'Controls', 0, 1, lambda x: None)
     cv2.createTrackbar('Ver rastro', 'Controls', 1, 1, lambda x: None)
     cv2.createTrackbar('Len rastro', 'Controls', 20, 200, lambda x: None)
@@ -70,7 +71,7 @@ def show_help_panel():
 
 # Trackbar settings persistence
 SETTINGS_FILE = 'trackbar_settings.json'
-TRACKBAR_NAMES = ['Umbral','Area minima','Distancia max','Max blobs','Historial','Varianza','Kalman','Ver rastro','Len rastro','Color B','Color G','Color R']
+TRACKBAR_NAMES = ['Umbral','Area minima','Distancia max','Max blobs','Historial','Varianza','Kernel','Kalman','Ver rastro','Len rastro','Color B','Color G','Color R']
 
 
 def save_trackbar_settings(path=SETTINGS_FILE):
@@ -116,13 +117,14 @@ class Preprocessor:
         if history!=self.history or var_thresh!=self.var_thresh:
             self.history, self.var_thresh = history, var_thresh
             self._reset()
-    def apply(self, frame, thresh):
+    def apply(self, frame, thresh, ksize):
         fg = self.bg.apply(frame)
         _, mask = cv2.threshold(fg, thresh, 255, cv2.THRESH_BINARY)
-        clean = cv2.morphologyEx(mask,
-                                 cv2.MORPH_OPEN,
-                                 cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3)),
-                                 iterations=2)
+        k = max(1, ksize)
+        if k % 2 == 0:
+            k += 1
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k))
+        clean = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=2)
         return fg, clean
 
 class BlobDetector:
@@ -280,6 +282,7 @@ if __name__=='__main__':
         trk.set_use_kalman(bool(cv2.getTrackbarPos('Kalman','Controls')))
         history=cv2.getTrackbarPos('Historial','Controls')
         var_t=cv2.getTrackbarPos('Varianza','Controls')
+        kernel_size=cv2.getTrackbarPos('Kernel','Controls')
         show_trails=bool(cv2.getTrackbarPos('Ver rastro','Controls'))
         trail_len=cv2.getTrackbarPos('Len rastro','Controls')
         color_b=cv2.getTrackbarPos('Color B','Controls')
@@ -291,7 +294,7 @@ if __name__=='__main__':
         cv2.imshow('Color', color_preview)
 
         pre.update(history,var_t)
-        fg,clean=pre.apply(frame,thresh)
+        fg,clean=pre.apply(frame,thresh,kernel_size)
         if roi is not None:
             x,y,w_roi,h_roi = roi
             mask_roi = np.zeros_like(clean)

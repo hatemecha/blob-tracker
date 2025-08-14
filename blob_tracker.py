@@ -311,6 +311,7 @@ if __name__=='__main__':
     track_logs = []
 
     while True:
+        start_tick = cv2.getTickCount()
         ret, frame = vs.read()
         if not ret:
             vs.reset(); frame_idx = 0; continue
@@ -370,6 +371,29 @@ if __name__=='__main__':
         cv2.putText(mosaic, progress_text,
                     (mosaic.shape[1] - text_size[0] - 10, 20),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+
+        end_tick = cv2.getTickCount()
+        fps = cv2.getTickFrequency() / (end_tick - start_tick) if end_tick != start_tick else 0
+        avg_size = np.mean([d['bbox'][2] * d['bbox'][3] for d in dets]) if dets else 0
+        speeds = []
+        for t in tracks:
+            trail = t.get('trail', [])
+            if len(trail) >= 2:
+                dx = trail[-1][0] - trail[-2][0]
+                dy = trail[-1][1] - trail[-2][1]
+                dist = (dx**2 + dy**2) ** 0.5
+                speeds.append(dist * fps)
+        avg_speed = np.mean(speeds) if speeds else 0
+        hud_lines = [
+            f"FPS: {fps:.2f}",
+            f"Blobs: {len(dets)}",
+            f"Tracks: {len(tracks)}",
+            f"Tamano medio: {avg_size:.1f}",
+            f"Velocidad media: {avg_speed:.1f}px/s",
+        ]
+        for i, line in enumerate(hud_lines):
+            cv2.putText(mosaic, line, (10, 40 + i * 20),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
         if show_help and not help_visible:
             show_help_panel()
             help_visible = True

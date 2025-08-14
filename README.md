@@ -61,7 +61,7 @@ pip install opencv-python numpy scipy moviepy tqdm
       * **Ver rastro:** Toggle (0/1) to show motion trails.
       * **Len rastro:** Number of recent positions drawn in the trail.
 5.  **Help Window:** A separate "Ayuda" window summarizes these controls and lists key commands (`s` to save, `l` to load, `r` to select/reset ROI, `e` to export, `q` to quit).
-6.  **Preview Window:** The "Preview" window will display the mosaic visualization of the processing output with quadrant labels (Original, Mascara FG, Mascara limpia y Salida).
+6.  **Preview Window:** The "Preview" window will display the mosaic visualization of the processing output with quadrant labels (Original, Mascara FG, Mascara limpia y Salida). The top-right corner shows the current frame and total frame count for quick progress reference.
 7.  **Export Video:** Press the `e` key while the "Preview" window is active to start video export. A progress bar will appear in the console. Once frame export is complete, audio will be merged with the video. The final output file will have `_with_audio.mp4` appended to its name.
 8.  **Quit:** Press the `q` key to close all windows and exit the program.
 9.  **CSV Log:** Upon exit, a CSV file with tracked positions is saved alongside the video (`*_tracks.csv`).

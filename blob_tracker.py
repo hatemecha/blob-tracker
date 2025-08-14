@@ -297,6 +297,11 @@ if __name__=='__main__':
         cv2.putText(mosaic,'Mascara FG',(w+10,20),cv2.FONT_HERSHEY_SIMPLEX,0.6,(255,255,255),1)
         cv2.putText(mosaic,'Mascara limpia',(10,h+20),cv2.FONT_HERSHEY_SIMPLEX,0.6,(255,255,255),1)
         cv2.putText(mosaic,'Salida',(w+10,h+20),cv2.FONT_HERSHEY_SIMPLEX,0.6,(255,255,255),1)
+        progress_text = f"Frame {frame_idx}/{vs.total_frames}"
+        text_size, _ = cv2.getTextSize(progress_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 1)
+        cv2.putText(mosaic, progress_text,
+                    (mosaic.shape[1] - text_size[0] - 10, 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
         show_help_panel()
 
         cv2.imshow('Preview',mosaic)

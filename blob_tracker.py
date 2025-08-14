@@ -39,6 +39,7 @@ def create_control_panel():
     cv2.createTrackbar('Historial', 'Controls', 500, 2000, lambda x: None)
     cv2.createTrackbar('Varianza', 'Controls', 16, 100, lambda x: None)
     cv2.createTrackbar('Kernel', 'Controls', 3, 21, lambda x: None)
+    cv2.createTrackbar('Iteraciones', 'Controls', 2, 10, lambda x: None)
     cv2.createTrackbar('Kalman', 'Controls', 0, 1, lambda x: None)
     cv2.createTrackbar('Ver rastro', 'Controls', 1, 1, lambda x: None)
     cv2.createTrackbar('Len rastro', 'Controls', 20, 200, lambda x: None)
@@ -56,6 +57,11 @@ def show_help_panel():
         "Max blobs - limite objetos",
         "Ratio min/max - relacion ancho/alto",
         "Circ min/max - circularidad",
+
+        "Historial - frames para fondo",
+        "Varianza - umbral de varianza",
+        "Kernel - tamano del kernel",
+        "Iteraciones - operaciones morfologicas",
 
         "Kalman - suavizado (0 off, 1 on)",
         "Ver rastro - mostrar rastro",
@@ -79,7 +85,7 @@ def show_help_panel():
 SETTINGS_FILE = 'trackbar_settings.json'
 TRACKBAR_NAMES = ['Umbral','Area minima','Distancia max','Max blobs',
                   'Ratio min','Ratio max','Circ min','Circ max',
-                  'Historial','Varianza','Kernel','Kalman','Ver rastro',
+                  'Historial','Varianza','Kernel','Iteraciones','Kalman','Ver rastro',
                   'Len rastro','Color B','Color G','Color R']
 
 
@@ -126,14 +132,18 @@ class Preprocessor:
         if history!=self.history or var_thresh!=self.var_thresh:
             self.history, self.var_thresh = history, var_thresh
             self._reset()
-    def apply(self, frame, thresh, ksize):
+    def apply(self, frame, thresh, ksize, iterations=2):
         fg = self.bg.apply(frame)
         _, mask = cv2.threshold(fg, thresh, 255, cv2.THRESH_BINARY)
         k = max(1, ksize)
         if k % 2 == 0:
             k += 1
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k))
-        clean = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=2)
+        if iterations > 0:
+            clean = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=iterations)
+            clean = cv2.morphologyEx(clean, cv2.MORPH_CLOSE, kernel, iterations=iterations)
+        else:
+            clean = mask
         return fg, clean
 
 class BlobDetector:
@@ -311,6 +321,7 @@ if __name__=='__main__':
         history=cv2.getTrackbarPos('Historial','Controls')
         var_t=cv2.getTrackbarPos('Varianza','Controls')
         kernel_size=cv2.getTrackbarPos('Kernel','Controls')
+        iterations=cv2.getTrackbarPos('Iteraciones','Controls')
         show_trails=bool(cv2.getTrackbarPos('Ver rastro','Controls'))
         trail_len=cv2.getTrackbarPos('Len rastro','Controls')
         color_b=cv2.getTrackbarPos('Color B','Controls')
@@ -322,7 +333,7 @@ if __name__=='__main__':
         cv2.imshow('Color', color_preview)
 
         pre.update(history,var_t)
-        fg,clean=pre.apply(frame,thresh,kernel_size)
+        fg,clean=pre.apply(frame,thresh,kernel_size,iterations)
         if roi is not None:
             x,y,w_roi,h_roi = roi
             mask_roi = np.zeros_like(clean)

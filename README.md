@@ -62,7 +62,8 @@ pip install opencv-python numpy scipy moviepy tqdm
       * **Kalman:** Toggle (0/1) for applying Kalman filter smoothing to tracked positions.
       * **Historial:** Length of history for the MOG2 background subtraction algorithm.
       * **Varianza:** Variance threshold for the MOG2 background subtraction algorithm.
-      * **Kernel:** Size of the morphological opening kernel used to clean noise after binarization.
+      * **Kernel:** Size of the morphological kernel used to clean noise after binarization.
+      * **Iteraciones:** Number of times the morphological open/close operations are applied.
       * **Ver rastro:** Toggle (0/1) to show motion trails.
       * **Len rastro:** Number of recent positions drawn in the trail.
       * **Color B/G/R:** Sets the bounding box color; the "Color" window previews the selection.
@@ -100,7 +101,7 @@ The script is organized into several functions and classes to modularize the dif
   * **`__init__(self, history, var_thresh)`:** Initializes the MOG2 background subtractor.
   * **`_reset()`:** Reinitializes the background subtractor with current parameters.
   * **`update(self, history, var_thresh)`:** Updates the background subtractor parameters if they've changed and resets it if necessary.
-  * **`apply(self, frame, thresh)`:** Applies background subtraction, binary thresholding, and morphological operations (opening) to the frame. Returns the foreground mask and the clean mask.
+  * **`apply(self, frame, thresh, ksize, iterations)`:** Applies background subtraction, binary thresholding, and morphological operations (opening followed by closing) to the frame using the specified kernel size and number of iterations. Returns the foreground mask and the clean mask.
 
   ### `BlobDetector`
 
@@ -128,7 +129,8 @@ The "Controls" panel allows for real-time manipulation of the following paramete
   * **Kalman:** Turns Kalman filter smoothing on (1) or off (0) for tracked positions.
   * **Historial:** The `history` parameter for `cv2.createBackgroundSubtractorMOG2`. How many frames are used for the background model.
   * **Varianza:** The `varThreshold` parameter for `cv2.createBackgroundSubtractorMOG2`. Determines how far a pixel can be from the mean to be considered foreground.
-  * **Kernel:** Size of the kernel for the morphological opening that cleans noise after binarization.
+  * **Kernel:** Size of the kernel for morphological operations that clean noise after binarization.
+  * **Iteraciones:** Number of iterations applied for morphological opening and closing.
   * **Ver rastro:** Toggles the drawing of motion trails.
   * **Len rastro:** Number of points kept in each trail.
 

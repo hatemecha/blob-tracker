@@ -58,6 +58,7 @@ def show_help_panel():
 
         "s: guardar  l: cargar",
         "r: ROI (definir/reset)",
+        "h: mostrar/ocultar ayuda",
 
         "e: exportar  q: salir",
     ]
@@ -253,6 +254,13 @@ if __name__=='__main__':
     create_control_panel()
     load_trackbar_settings()
     cv2.namedWindow('Preview', cv2.WINDOW_NORMAL)
+    cv2.namedWindow('Color', cv2.WINDOW_NORMAL)
+
+    show_help = True
+    help_visible = False
+    if show_help:
+        show_help_panel()
+        help_visible = True
 
     pre = Preprocessor(500,16); det=BlobDetector(500); trk=Tracker(50)
     exporting = False; writer = None; bar = None
@@ -278,6 +286,9 @@ if __name__=='__main__':
         color_g=cv2.getTrackbarPos('Color G','Controls')
         color_r=cv2.getTrackbarPos('Color R','Controls')
         current_color=(color_b,color_g,color_r)
+        color_preview = np.zeros((50,50,3), dtype=np.uint8)
+        color_preview[:] = current_color
+        cv2.imshow('Color', color_preview)
 
         pre.update(history,var_t)
         fg,clean=pre.apply(frame,thresh)
@@ -311,7 +322,12 @@ if __name__=='__main__':
         cv2.putText(mosaic, progress_text,
                     (mosaic.shape[1] - text_size[0] - 10, 20),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-        show_help_panel()
+        if show_help and not help_visible:
+            show_help_panel()
+            help_visible = True
+        elif not show_help and help_visible:
+            cv2.destroyWindow('Ayuda')
+            help_visible = False
 
         cv2.imshow('Preview',mosaic)
         key=cv2.waitKey(1)&0xFF
@@ -340,6 +356,8 @@ if __name__=='__main__':
                 final.write_videofile(out_frames.replace('.mp4','_with_audio.mp4'), codec='libx264', audio_codec='aac')
                 print('Export complete with audio')
                 vs.reset(); frame_idx = 0
+        if key==ord('h'):
+            show_help = not show_help
         if key==ord('q'): break
     vs.release()
     cv2.destroyAllWindows()

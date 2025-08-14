@@ -68,7 +68,9 @@ def show_help_panel():
         "Kalman - suavizado (0 off, 1 on)",
         "Ver rastro - mostrar rastro",
         "Len rastro - puntos en rastro",
+
         "Color B/G/R - color para los IDs",
+
 
         "s: guardar  l: cargar",
         "r: ROI (definir/reset)",
@@ -210,6 +212,14 @@ class Tracker:
         self.use_kalman = flag
         if not flag:
             self.filters.clear()
+    def _assign_color(self, preferred):
+        used = set(self.colors.values())
+        if preferred not in used:
+            return preferred
+        while True:
+            cand = tuple(np.random.randint(0, 256, 3).tolist())
+            if cand not in used:
+                return cand
 
     def update(self, detections, max_blobs, trail_len, color=(0,255,0)):
         tracks = []
@@ -252,7 +262,9 @@ class Tracker:
                 self.trails[oid] = self.trails[oid][-trail_len:]
                 self.missed[oid] = 0
                 det['id'] = oid
+
                 det['color'] = color
+
                 det['trail'] = self.trails[oid]
                 tracks.append(det)
         for idx, det in enumerate(dets):
@@ -262,8 +274,10 @@ class Tracker:
                 self.objects[oid] = det['centroid']
                 self.trails[oid] = [det['centroid']]
                 self.missed[oid] = 0
+
                 det['id'] = oid
                 det['color'] = color
+
                 det['trail'] = self.trails[oid]
                 if self.use_kalman:
                     self.filters[oid] = self._create_kf(det['centroid'])
@@ -278,6 +292,8 @@ class Tracker:
                     self.trails.pop(oid, None)
                     self.filters.pop(oid, None)
                     self.missed.pop(oid, None)
+
+
         return tracks
 
 class Visualizer:

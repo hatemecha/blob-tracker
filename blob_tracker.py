@@ -37,6 +37,9 @@ def create_control_panel():
     cv2.createTrackbar('Kalman', 'Controls', 0, 1, lambda x: None)
     cv2.createTrackbar('Ver rastro', 'Controls', 1, 1, lambda x: None)
     cv2.createTrackbar('Len rastro', 'Controls', 20, 200, lambda x: None)
+    cv2.createTrackbar('Color B', 'Controls', 0, 255, lambda x: None)
+    cv2.createTrackbar('Color G', 'Controls', 255, 255, lambda x: None)
+    cv2.createTrackbar('Color R', 'Controls', 0, 255, lambda x: None)
 
 
 def show_help_panel():
@@ -51,6 +54,7 @@ def show_help_panel():
         "Kalman - suavizado (0 off, 1 on)",
         "Ver rastro - mostrar rastro",
         "Len rastro - puntos en rastro",
+        "Color B/G/R - color del recuadro",
 
         "s: guardar  l: cargar",
         "r: ROI (definir/reset)",
@@ -65,7 +69,7 @@ def show_help_panel():
 
 # Trackbar settings persistence
 SETTINGS_FILE = 'trackbar_settings.json'
-TRACKBAR_NAMES = ['Umbral','Area minima','Distancia max','Max blobs','Historial','Varianza','Kalman','Ver rastro','Len rastro']
+TRACKBAR_NAMES = ['Umbral','Area minima','Distancia max','Max blobs','Historial','Varianza','Kalman','Ver rastro','Len rastro','Color B','Color G','Color R']
 
 
 def save_trackbar_settings(path=SETTINGS_FILE):
@@ -161,7 +165,7 @@ class Tracker:
         if not flag:
             self.filters.clear()
 
-    def update(self, detections, max_blobs, trail_len):
+    def update(self, detections, max_blobs, trail_len, color=(0,255,0)):
         tracks = []
         dets = sorted(detections,
                       key=lambda d: d['bbox'][2] * d['bbox'][3],
@@ -199,7 +203,8 @@ class Tracker:
                 self.trails.setdefault(oid, []).append(det['centroid'])
                 self.trails[oid] = self.trails[oid][-trail_len:]
                 det['id'] = oid
-                det['color'] = self.colors.get(oid, (0,255,0))
+                self.colors[oid] = color
+                det['color'] = self.colors[oid]
                 det['trail'] = self.trails[oid]
                 tracks.append(det)
         for idx, det in enumerate(dets):
@@ -207,7 +212,7 @@ class Tracker:
                 oid = self.next_id
                 self.next_id += 1
                 self.objects[oid] = det['centroid']
-                self.colors[oid] = tuple(np.random.randint(0,256,3).tolist())
+                self.colors[oid] = color
                 self.trails[oid] = [det['centroid']]
                 det['id'] = oid
                 det['color'] = self.colors[oid]
@@ -269,6 +274,10 @@ if __name__=='__main__':
         var_t=cv2.getTrackbarPos('Varianza','Controls')
         show_trails=bool(cv2.getTrackbarPos('Ver rastro','Controls'))
         trail_len=cv2.getTrackbarPos('Len rastro','Controls')
+        color_b=cv2.getTrackbarPos('Color B','Controls')
+        color_g=cv2.getTrackbarPos('Color G','Controls')
+        color_r=cv2.getTrackbarPos('Color R','Controls')
+        current_color=(color_b,color_g,color_r)
 
         pre.update(history,var_t)
         fg,clean=pre.apply(frame,thresh)
@@ -281,7 +290,7 @@ if __name__=='__main__':
             mask_fg[y:y+h_roi, x:x+w_roi] = fg[y:y+h_roi, x:x+w_roi]
             fg = mask_fg
         dets=det.detect(clean)
-        tracks=trk.update(dets,max_blobs,trail_len)
+        tracks=trk.update(dets,max_blobs,trail_len,current_color)
         out=Visualizer.draw(frame.copy(),tracks,show_trails)
         if roi is not None:
             x,y,w_roi,h_roi = roi

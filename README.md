@@ -30,6 +30,7 @@
   * **Preset Persistence:** Save and load control-panel settings with keyboard shortcuts.
   * **Color Preview Window:** Visualize the currently selected bounding box color.
   * **Mosaic Visualization:** Simultaneously displays the original frame, foreground mask, clean mask, and the output frame with tracked objects.
+  * **Metrics HUD:** Real-time overlay showing FPS, detected blobs, active tracks, average blob size, and average speed.
   * **Video & CSV Export:** Exports the processed video to a new MP4 file and logs tracked positions to a CSV.
   * **Audio Merging:** Automatically combines the audio from the original video with the exported video.
 

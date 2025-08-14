@@ -25,8 +25,9 @@
   * **Shape Filtering:** Discards blobs based on configurable aspect ratio and circularity ranges.
   * **Object Tracking:** Uses a cost matrix with the Hungarian algorithm to assign detections to tracked objects, with an optional Kalman filter for smoother position estimates.
   * **ROI Selection:** Define a rectangular region of interest to focus detection and tracking.
-  * **Per-object Colors & Motion Trails:** Each object receives a unique color and an optional trail showing recent positions.
-  * **Real-time Control Panel:** Adjust threshold, minimum blob area, maximum tracking distance, number of blobs, background subtractor history, variance threshold, Kalman filtering, and trail visualization.
+  * **User-selected Color & Motion Trails:** All objects are drawn in the chosen color, with optional trails showing recent positions.
+  * **Track Disappearance:** Tracks that are not reassigned are removed after a configurable number of missed frames.
+  * **Real-time Control Panel:** Adjust threshold, minimum blob area, maximum tracking distance, allowed missed frames, number of blobs, background subtractor history, variance threshold, Kalman filtering, and trail visualization.
   * **Preset Persistence:** Save and load control-panel settings with keyboard shortcuts.
   * **Color Preview Window:** Visualize the currently selected bounding box color.
   * **Mosaic Visualization:** Simultaneously displays the original frame, foreground mask, clean mask, and the output frame with tracked objects.
@@ -57,6 +58,7 @@ pip install opencv-python numpy scipy moviepy tqdm
 
       * **Area minima:** Minimum area (in square pixels) for a contour to be considered a blob.
       * **Distancia max:** Maximum distance (in pixels) between a detected blob's centroid and an existing tracked object for it to be considered the same object.
+      * **Max missed:** Consecutive frames without assignment before a track is removed.
       * **Max blobs:** Maximum number of blobs to track (larger blobs are prioritized).
       * **Ratio min / Ratio max:** Minimum and maximum width/height ratios allowed for blobs.
       * **Circ min / Circ max:** Minimum and maximum circularity values allowed for blobs (0-1).
@@ -67,7 +69,7 @@ pip install opencv-python numpy scipy moviepy tqdm
       * **Iteraciones:** Number of times the morphological open/close operations are applied.
       * **Ver rastro:** Toggle (0/1) to show motion trails.
       * **Len rastro:** Number of recent positions drawn in the trail.
-      * **Color B/G/R:** Sets the bounding box color; the "Color" window previews the selection.
+      * **Color B/G/R:** Color used for drawing all IDs; the "Color" window previews the selection.
 5.  **Help Window:** A separate "Ayuda" window (toggle with `h`) summarizes these controls and lists key commands (`s` to save, `l` to load, `r` to select/reset ROI, `e` to export, `q` to quit).
 6.  **Preview Window:** The "Preview" window will display the mosaic visualization of the processing output with quadrant labels (Original, Mascara FG, Mascara limpia y Salida). The top-right corner shows the current frame and total frame count for quick progress reference.
 7.  **Export Video:** Press the `e` key while the "Preview" window is active to start video export. A progress bar will appear in the console. Once frame export is complete, audio will be merged with the video. The final output file will have `_with_audio.mp4` appended to its name.
@@ -84,7 +86,7 @@ The script is organized into several functions and classes to modularize the dif
   * **`VideoSource`:** Class to encapsulate video file reading and management.
   * **`Preprocessor`:** Class responsible for background subtraction and image preprocessing.
   * **`BlobDetector`:** Class for detecting blobs (contours) in the preprocessed mask with optional shape filtering.
-  * **`Tracker`:** Class that manages the tracking of multiple objects, using the Hungarian algorithm for assignment, optional Kalman filters, and per-object colors and trails.
+  * **`Tracker`:** Class that manages the tracking of multiple objects, using the Hungarian algorithm for assignment, optional Kalman filters, trails, and track disappearance logic.
   * **`Visualizer`:** Static class for drawing tracking results and optional motion trails on the frame.
   * **`if __name__ == '__main__':` (Main Block):** The main loop that initializes classes, reads frames, applies processing, updates parameters from the control panel, and manages visualization and export.
 
@@ -111,8 +113,8 @@ The script is organized into several functions and classes to modularize the dif
 
 ### `Tracker`
 
-  * **`__init__(self, max_dist, use_kalman=False)`:** Initializes the tracker with the maximum assignment distance, optional Kalman filtering, and stores object states, colors, and trails.
-  * **`update(self, detections, max_blobs, trail_len)`:** Builds a cost matrix between detections and existing objects and uses the Hungarian algorithm for assignment. New objects receive IDs and colors; trails are trimmed to `trail_len`. Returns a list of tracked detections with IDs, colors, and trails.
+  * **`__init__(self, max_dist, use_kalman=False, max_missed=10)`:** Initializes the tracker with the maximum assignment distance, optional Kalman filtering, and the number of consecutive frames an object can miss before being removed. Stores object states and trails.
+  * **`update(self, detections, max_blobs, trail_len, color)`:** Builds a cost matrix between detections and existing objects and uses the Hungarian algorithm for assignment. All tracks use the provided color; tracks exceeding `max_missed` frames without assignment are discarded. Trails are trimmed to `trail_len`. Returns a list of tracked detections with IDs, colors, and trails.
 
 ### `Visualizer`
 

@@ -31,6 +31,7 @@ def create_control_panel():
 
     cv2.createTrackbar('Area minima', 'Controls', 500, 5000, lambda x: None)
     cv2.createTrackbar('Distancia max', 'Controls', 50, 200, lambda x: None)
+    cv2.createTrackbar('Max missed', 'Controls', 10, 100, lambda x: None)
     cv2.createTrackbar('Max blobs', 'Controls', 10, 100, lambda x: None)
     cv2.createTrackbar('Ratio min', 'Controls', 0, 500, lambda x: None)
     cv2.createTrackbar('Ratio max', 'Controls', 500, 500, lambda x: None)
@@ -54,6 +55,7 @@ def show_help_panel():
         "Umbral - binarizacion",
         "Area minima - tamano minimo",
         "Distancia max - seguimiento",
+        "Max missed - frames sin asignacion",
         "Max blobs - limite objetos",
         "Ratio min/max - relacion ancho/alto (valor/100)",
         "Circ min/max - circularidad (valor/100)",
@@ -66,7 +68,7 @@ def show_help_panel():
         "Kalman - suavizado (0 off, 1 on)",
         "Ver rastro - mostrar rastro",
         "Len rastro - puntos en rastro",
-        "Color B/G/R - color del recuadro",
+        "Color B/G/R - color para los IDs",
 
         "s: guardar  l: cargar",
         "r: ROI (definir/reset)",
@@ -83,7 +85,7 @@ def show_help_panel():
 
 # Trackbar settings persistence
 SETTINGS_FILE = 'trackbar_settings.json'
-TRACKBAR_NAMES = ['Umbral','Area minima','Distancia max','Max blobs',
+TRACKBAR_NAMES = ['Umbral','Area minima','Distancia max','Max missed','Max blobs',
                   'Ratio min','Ratio max','Circ min','Circ max',
                   'Historial','Varianza','Kernel','Iteraciones','Kalman','Ver rastro',
                   'Len rastro','Color B','Color G','Color R']
@@ -180,14 +182,15 @@ class BlobDetector:
         return blobs
 
 class Tracker:
-    def __init__(self, max_dist, use_kalman=False):
+    def __init__(self, max_dist, use_kalman=False, max_missed=10):
         self.max_dist = max_dist
         self.use_kalman = use_kalman
+        self.max_missed = max_missed
         self.next_id = 1
         self.objects = {}
         self.filters = {}
-        self.colors = {}
         self.trails = {}
+        self.missed = {}
 
     def _create_kf(self, centroid):
         kf = cv2.KalmanFilter(4, 2)
@@ -225,11 +228,13 @@ class Tracker:
             row_ind, col_ind = np.array([], dtype=int), np.array([], dtype=int)
 
         assigned_dets = set()
+        matched_ids = set()
         for r, c in zip(row_ind, col_ind):
             if cost[r, c] <= self.max_dist:
                 oid = obj_ids[r]
                 det = dets[c]
                 assigned_dets.add(c)
+                matched_ids.add(oid)
                 if self.use_kalman:
                     if oid not in self.filters:
                         self.filters[oid] = self._create_kf(det['centroid'])
@@ -245,9 +250,9 @@ class Tracker:
                     self.objects[oid] = det['centroid']
                 self.trails.setdefault(oid, []).append(det['centroid'])
                 self.trails[oid] = self.trails[oid][-trail_len:]
+                self.missed[oid] = 0
                 det['id'] = oid
-                self.colors[oid] = color
-                det['color'] = self.colors[oid]
+                det['color'] = color
                 det['trail'] = self.trails[oid]
                 tracks.append(det)
         for idx, det in enumerate(dets):
@@ -255,14 +260,24 @@ class Tracker:
                 oid = self.next_id
                 self.next_id += 1
                 self.objects[oid] = det['centroid']
-                self.colors[oid] = color
                 self.trails[oid] = [det['centroid']]
+                self.missed[oid] = 0
                 det['id'] = oid
-                det['color'] = self.colors[oid]
+                det['color'] = color
                 det['trail'] = self.trails[oid]
                 if self.use_kalman:
                     self.filters[oid] = self._create_kf(det['centroid'])
                 tracks.append(det)
+                matched_ids.add(oid)
+
+        for oid in list(self.objects.keys()):
+            if oid not in matched_ids:
+                self.missed[oid] = self.missed.get(oid, 0) + 1
+                if self.missed[oid] > self.max_missed:
+                    self.objects.pop(oid, None)
+                    self.trails.pop(oid, None)
+                    self.filters.pop(oid, None)
+                    self.missed.pop(oid, None)
         return tracks
 
 class Visualizer:
@@ -319,6 +334,7 @@ if __name__=='__main__':
 
         det.min_area=cv2.getTrackbarPos('Area minima','Controls')
         trk.max_dist=cv2.getTrackbarPos('Distancia max','Controls')
+        trk.max_missed=cv2.getTrackbarPos('Max missed','Controls')
         max_blobs=cv2.getTrackbarPos('Max blobs','Controls')
         det.ar_min=cv2.getTrackbarPos('Ratio min','Controls')/100.0
         det.ar_max=cv2.getTrackbarPos('Ratio max','Controls')/100.0

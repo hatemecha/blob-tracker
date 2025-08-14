@@ -22,6 +22,7 @@
   * **Video File Selection:** Graphical interface to easily select the input video.
   * **Foreground Segmentation:** Uses the MOG2 algorithm for background subtraction to create a foreground mask.
   * **Blob Detection:** Identifies contours in the foreground mask and filters out those below a defined minimum area.
+  * **Shape Filtering:** Discards blobs based on configurable aspect ratio and circularity ranges.
   * **Object Tracking:** Uses a cost matrix with the Hungarian algorithm to assign detections to tracked objects, with an optional Kalman filter for smoother position estimates.
   * **ROI Selection:** Define a rectangular region of interest to focus detection and tracking.
   * **Per-object Colors & Motion Trails:** Each object receives a unique color and an optional trail showing recent positions.
@@ -56,6 +57,8 @@ pip install opencv-python numpy scipy moviepy tqdm
       * **Area minima:** Minimum area (in square pixels) for a contour to be considered a blob.
       * **Distancia max:** Maximum distance (in pixels) between a detected blob's centroid and an existing tracked object for it to be considered the same object.
       * **Max blobs:** Maximum number of blobs to track (larger blobs are prioritized).
+      * **Ratio min / Ratio max:** Minimum and maximum width/height ratios allowed for blobs.
+      * **Circ min / Circ max:** Minimum and maximum circularity values allowed for blobs (0-1).
       * **Kalman:** Toggle (0/1) for applying Kalman filter smoothing to tracked positions.
       * **Historial:** Length of history for the MOG2 background subtraction algorithm.
       * **Varianza:** Variance threshold for the MOG2 background subtraction algorithm.
@@ -78,7 +81,7 @@ The script is organized into several functions and classes to modularize the dif
   * **`create_control_panel()`:** Sets up the OpenCV control window with sliders for all adjustable parameters, including a toggle for Kalman filtering.
   * **`VideoSource`:** Class to encapsulate video file reading and management.
   * **`Preprocessor`:** Class responsible for background subtraction and image preprocessing.
-  * **`BlobDetector`:** Class for detecting blobs (contours) in the preprocessed mask.
+  * **`BlobDetector`:** Class for detecting blobs (contours) in the preprocessed mask with optional shape filtering.
   * **`Tracker`:** Class that manages the tracking of multiple objects, using the Hungarian algorithm for assignment, optional Kalman filters, and per-object colors and trails.
   * **`Visualizer`:** Static class for drawing tracking results and optional motion trails on the frame.
   * **`if __name__ == '__main__':` (Main Block):** The main loop that initializes classes, reads frames, applies processing, updates parameters from the control panel, and manages visualization and export.
@@ -99,10 +102,10 @@ The script is organized into several functions and classes to modularize the dif
   * **`update(self, history, var_thresh)`:** Updates the background subtractor parameters if they've changed and resets it if necessary.
   * **`apply(self, frame, thresh)`:** Applies background subtraction, binary thresholding, and morphological operations (opening) to the frame. Returns the foreground mask and the clean mask.
 
-### `BlobDetector`
+  ### `BlobDetector`
 
-  * **`__init__(self, min_area)`:** Initializes the detector with the minimum blob area.
-  * **`detect(self, mask)`:** Finds contours in the mask and filters out those smaller than `min_area`. Returns a list of blob dictionaries with `centroid` and `bbox`.
+  * **`__init__(self, min_area, ar_min=0.0, ar_max=5.0, circ_min=0.0, circ_max=1.0)`:** Initializes the detector with area and shape thresholds.
+  * **`detect(self, mask)`:** Finds contours in the mask, filters by area, aspect ratio, and circularity, and returns a list of blob dictionaries with `centroid` and `bbox`.
 
 ### `Tracker`
 

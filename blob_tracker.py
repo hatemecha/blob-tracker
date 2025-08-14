@@ -32,6 +32,10 @@ def create_control_panel():
     cv2.createTrackbar('Area minima', 'Controls', 500, 5000, lambda x: None)
     cv2.createTrackbar('Distancia max', 'Controls', 50, 200, lambda x: None)
     cv2.createTrackbar('Max blobs', 'Controls', 10, 100, lambda x: None)
+    cv2.createTrackbar('Ratio min', 'Controls', 0, 500, lambda x: None)
+    cv2.createTrackbar('Ratio max', 'Controls', 500, 500, lambda x: None)
+    cv2.createTrackbar('Circ min', 'Controls', 0, 100, lambda x: None)
+    cv2.createTrackbar('Circ max', 'Controls', 100, 100, lambda x: None)
     cv2.createTrackbar('Historial', 'Controls', 500, 2000, lambda x: None)
     cv2.createTrackbar('Varianza', 'Controls', 16, 100, lambda x: None)
     cv2.createTrackbar('Kernel', 'Controls', 3, 21, lambda x: None)
@@ -44,13 +48,14 @@ def create_control_panel():
 
 
 def show_help_panel():
-    help_img = np.zeros((360, 400, 3), dtype=np.uint8)
     lines = [
         "Deslizadores en 'Controls':",
         "Umbral - binarizacion",
         "Area minima - tamano minimo",
         "Distancia max - seguimiento",
         "Max blobs - limite objetos",
+        "Ratio min/max - relacion ancho/alto",
+        "Circ min/max - circularidad",
 
         "Kalman - suavizado (0 off, 1 on)",
         "Ver rastro - mostrar rastro",
@@ -63,6 +68,7 @@ def show_help_panel():
 
         "e: exportar  q: salir",
     ]
+    help_img = np.zeros((30 * (len(lines) + 1), 400, 3), dtype=np.uint8)
     for i, line in enumerate(lines):
         cv2.putText(help_img, line, (10, 30 + i*30), cv2.FONT_HERSHEY_SIMPLEX,
                     0.5, (255, 255, 255), 1)
@@ -71,7 +77,10 @@ def show_help_panel():
 
 # Trackbar settings persistence
 SETTINGS_FILE = 'trackbar_settings.json'
-TRACKBAR_NAMES = ['Umbral','Area minima','Distancia max','Max blobs','Historial','Varianza','Kernel','Kalman','Ver rastro','Len rastro','Color B','Color G','Color R']
+TRACKBAR_NAMES = ['Umbral','Area minima','Distancia max','Max blobs',
+                  'Ratio min','Ratio max','Circ min','Circ max',
+                  'Historial','Varianza','Kernel','Kalman','Ver rastro',
+                  'Len rastro','Color B','Color G','Color R']
 
 
 def save_trackbar_settings(path=SETTINGS_FILE):
@@ -128,15 +137,30 @@ class Preprocessor:
         return fg, clean
 
 class BlobDetector:
-    def __init__(self, min_area): self.min_area = min_area
+    def __init__(self, min_area, ar_min=0.0, ar_max=5.0, circ_min=0.0, circ_max=1.0):
+        self.min_area = min_area
+        self.ar_min = ar_min
+        self.ar_max = ar_max
+        self.circ_min = circ_min
+        self.circ_max = circ_max
+
     def detect(self, mask):
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         blobs = []
         for cnt in contours:
-            if cv2.contourArea(cnt) >= self.min_area:
-                x,y,w,h = cv2.boundingRect(cnt)
-                c = (x+w//2, y+h//2)
-                blobs.append({'centroid':c, 'bbox':(x,y,w,h)})
+            area = cv2.contourArea(cnt)
+            if area < self.min_area:
+                continue
+            x,y,w,h = cv2.boundingRect(cnt)
+            aspect = w / h if h else 0
+            peri = cv2.arcLength(cnt, True)
+            circ = (4*np.pi*area)/(peri*peri) if peri > 0 else 0
+            if not (self.ar_min <= aspect <= self.ar_max):
+                continue
+            if not (self.circ_min <= circ <= self.circ_max):
+                continue
+            c = (x+w//2, y+h//2)
+            blobs.append({'centroid':c, 'bbox':(x,y,w,h)})
         return blobs
 
 class Tracker:
@@ -279,6 +303,10 @@ if __name__=='__main__':
         det.min_area=cv2.getTrackbarPos('Area minima','Controls')
         trk.max_dist=cv2.getTrackbarPos('Distancia max','Controls')
         max_blobs=cv2.getTrackbarPos('Max blobs','Controls')
+        det.ar_min=cv2.getTrackbarPos('Ratio min','Controls')/100.0
+        det.ar_max=cv2.getTrackbarPos('Ratio max','Controls')/100.0
+        det.circ_min=cv2.getTrackbarPos('Circ min','Controls')/100.0
+        det.circ_max=cv2.getTrackbarPos('Circ max','Controls')/100.0
         trk.set_use_kalman(bool(cv2.getTrackbarPos('Kalman','Controls')))
         history=cv2.getTrackbarPos('Historial','Controls')
         var_t=cv2.getTrackbarPos('Varianza','Controls')
